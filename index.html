@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cronómetro de Registros</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body { background-color: #f8f9fa; padding-top: 20px; }
+        .timer-display { font-size: 3rem; font-weight: bold; color: #0d6efd; }
+        .card { box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        #listaRegistros { max-height: 200px; overflow-y: auto; }
+        #btnSilenciar { display: none; } /* Oculto por defecto */
+    </style>
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+	<style>
+		body {
+			touch-action: manipulation;
+			user-select: none;
+		}
+	</style>
+</head>
+<body>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card p-4 mb-4">
+                <h2 class="text-center mb-4">Control registro BHP BHT</h2>
+                
+                <div class="mb-3">
+                    <label class="form-label">Configurar Tiempo (HH:MM:SS)</label>
+                    <div class="input-group">
+                        <input type="number" id="cfgHoras" class="form-control" placeholder="HH" min="0" max="23" value="0">
+                        <input type="number" id="cfgMinutos" class="form-control" placeholder="MM" min="0" max="59" value="5">
+                        <input type="number" id="cfgSegundos" class="form-control" placeholder="SS" min="0" max="59" value="0">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Nota:</label>
+                    <input type="text" id="notaTexto" class="form-control" placeholder="Ej: 1000 ft">
+                </div>
+
+                <div class="text-center mb-3">
+                    <div id="display" class="timer-display">00:00:00</div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button id="btnIniciar" class="btn btn-primary btn-lg" onclick="iniciarProceso()">Registrar hora e iniciar conteo</button>
+                    <button id="btnSilenciar" class="btn btn-warning btn-lg" onclick="detenerAlarma()">Silenciar Alarma</button>
+                    <button id="btnFinalizar" class="btn btn-danger" onclick="finalizarYExportar()">Finalizar y Exportar Excel</button>
+                </div>
+            </div>
+
+            <div class="card p-3">
+                <h5>Registros en sesión:</h5>
+                <ul id="listaRegistros" class="list-group list-group-flush"></ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<audio id="alarmaAudio" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto" loop></audio>
+
+<script>
+    let interval;
+    let alarmInterval;
+    let tiempoRestante = 0;
+    const registrosKey = 'mis_registros_app';
+
+    window.onload = actualizarLista;
+
+    function iniciarProceso() {
+        const nota = document.getElementById('notaTexto').value.trim();
+        if (!nota) {
+            alert("Por favor, escribe algo en la caja de texto.");
+            return;
+        }
+
+        const ahora = new Date();
+        const horaExacta = ahora.toLocaleTimeString();
+        const nuevoRegistro = { hora: horaExacta, nota: nota };
+        
+        let datos = JSON.parse(localStorage.getItem(registrosKey)) || [];
+        datos.push(nuevoRegistro);
+        localStorage.setItem(registrosKey, JSON.stringify(datos));
+        
+        actualizarLista();
+
+        const h = parseInt(document.getElementById('cfgHoras').value) || 0;
+        const m = parseInt(document.getElementById('cfgMinutos').value) || 0;
+        const s = parseInt(document.getElementById('cfgSegundos').value) || 0;
+        
+        tiempoRestante = (h * 3600) + (m * 60) + s;
+
+        if (tiempoRestante <= 0) {
+            alert("Configura un tiempo mayor a 0.");
+            return;
+        }
+
+        document.getElementById('btnIniciar').style.display = 'none';
+        document.getElementById('btnFinalizar').style.display = 'none';
+        document.getElementById('notaTexto').disabled = true;
+
+        clearInterval(interval);
+        interval = setInterval(() => {
+            tiempoRestante--;
+            actualizarDisplay();
+
+            if (tiempoRestante <= 0) {
+                clearInterval(interval);
+                activarAlarma();
+            }
+        }, 1000);
+    }
+
+    function activarAlarma() {
+        const audio = document.getElementById('alarmaAudio');
+        document.getElementById('btnSilenciar').style.display = 'block';
+
+        alarmInterval = setInterval(() => {
+            audio.currentTime = 0;
+            audio.play().catch(e => console.log("Interacción requerida"));
+        }, 1000);
+    }
+
+    function detenerAlarma() {
+        clearInterval(alarmInterval);
+        const audio = document.getElementById('alarmaAudio');
+        audio.pause();
+
+        document.getElementById('btnSilenciar').style.display = 'none';
+        document.getElementById('btnIniciar').style.display = 'block';
+        document.getElementById('btnFinalizar').style.display = 'block';
+        document.getElementById('notaTexto').disabled = false;
+        document.getElementById('notaTexto').value = "";
+        document.getElementById('display').innerText = "00:00:00";
+    }
+
+    function actualizarDisplay() {
+        const h = Math.floor(tiempoRestante / 3600);
+        const m = Math.floor((tiempoRestante % 3600) / 60);
+        const s = tiempoRestante % 60;
+        document.getElementById('display').innerText = 
+            `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function actualizarLista() {
+        const lista = document.getElementById('listaRegistros');
+        const datos = JSON.parse(localStorage.getItem(registrosKey)) || [];
+        lista.innerHTML = datos.map(r => `<li class="list-group-item small"><b>${r.hora}</b> - ${r.nota}</li>`).join('');
+    }
+
+    function finalizarYExportar() {
+        const datos = JSON.parse(localStorage.getItem(registrosKey)) || [];
+        if (datos.length === 0) {
+            alert("No hay datos para exportar.");
+            return;
+        }
+
+        const ws = XLSX.utils.json_to_sheet(datos);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Registros");
+        XLSX.writeFile(wb, `Reporte_Registros_${new Date().getTime()}.xlsx`);
+
+        localStorage.removeItem(registrosKey);
+        clearInterval(interval);
+        clearInterval(alarmInterval);
+        
+        document.getElementById('display').innerText = "00:00:00";
+        document.getElementById('btnSilenciar').style.display = 'none';
+        document.getElementById('btnIniciar').style.display = 'block';
+        document.getElementById('btnFinalizar').style.display = 'block';
+        document.getElementById('notaTexto').disabled = false;
+        actualizarLista();
+    }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

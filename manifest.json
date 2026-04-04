@@ -1,0 +1,15 @@
+{
+  "short_name": "RegisPT",
+  "name": "Control Registro BHP BHT",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1082/1082810.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "./index.html",
+  "display": "standalone",
+  "theme_color": "#0d6efd",
+  "background_color": "#f8f9fa"
+}
