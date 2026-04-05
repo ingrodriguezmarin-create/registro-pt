@@ -1,17 +1,24 @@
 {
   "short_name": "RegisPT",
-  "name": "Registro BHP BHT",
+  "name": "Registro BHP BHT Pro",
+  "description": "Aplicación de control de registros de tiempos",
   "icons": [
     {
       "src": "https://cdn-icons-png.flaticon.com/512/1082/1082810.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1082/1082810.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "start_url": "/registro-pt/index.html",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#ffffff",
-  "theme_color": "#0d6efd"
+  "background_color": "#0d6efd",
+  "theme_color": "#0d6efd",
+  "orientation": "portrait"
 }
