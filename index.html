@@ -64,7 +64,7 @@
     </div>
 </div>
 
-<audio id="alarmaAudio" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto" loop></audio>
+<audio id="alarmaAudio" src="https://actions.google.com/sounds/v1/alarms/spaceship_alarm.ogg" preload="auto" loop></audio>
 
 <script>
     let interval;
@@ -73,14 +73,26 @@
     const registrosKey = 'mis_registros_app';
     const timerKey = 'timer_finalizacion_pt';
 
-    // Solicitar permiso de notificaciones al cargar
     window.onload = () => {
         actualizarLista();
-        if ("Notification" in window) {
-            Notification.requestPermission();
-        }
+        solicitarPermisos();
         recuperarTimer();
+        registrarSW();
     };
+
+    function registrarSW() {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(err => console.log("SW error", err));
+        }
+    }
+
+    function solicitarPermisos() {
+        if ("Notification" in window) {
+            Notification.requestPermission().then(perm => {
+                if (perm !== "granted") alert("Activa las notificaciones para avisarte al finalizar.");
+            });
+        }
+    }
 
     function recuperarTimer() {
         const guardado = localStorage.getItem(timerKey);
@@ -106,14 +118,12 @@
 
         if (totalSegundos <= 0) return alert("Tiempo inválido.");
 
-        // Guardar registro
         const ahora = new Date();
         let datos = JSON.parse(localStorage.getItem(registrosKey)) || [];
         datos.push({ hora: ahora.toLocaleTimeString(), nota: nota });
         localStorage.setItem(registrosKey, JSON.stringify(datos));
         actualizarLista();
 
-        // Configurar fin del tiempo
         tiempoFinalizadoMS = Date.now() + (totalSegundos * 1000);
         localStorage.setItem(timerKey, tiempoFinalizadoMS);
 
@@ -140,22 +150,29 @@
         const audio = document.getElementById('alarmaAudio');
         document.getElementById('btnSilenciar').style.display = 'block';
         
-        // Vibración
-        if ("vibrate" in navigator) navigator.vibrate([500, 300, 500, 300, 500]);
+        if ("vibrate" in navigator) navigator.vibrate([1000, 500, 1000, 500, 1000]);
 
-        // Notificación Push
         if (Notification.permission === "granted") {
-            new Notification("¡TIEMPO CUMPLIDO!", {
-                body: "El tiempo de registro ha finalizado.",
-                icon: "https://cdn-icons-png.flaticon.com/512/1082/1082810.png"
-            });
+            const title = "¡TIEMPO CUMPLIDO!";
+            const options = {
+                body: "El registro BHP BHT ha finalizado.",
+                icon: "https://cdn-icons-png.flaticon.com/512/1082/1082810.png",
+                vibrate: [500, 110, 500, 110, 450, 110, 200, 110, 170, 40, 450, 110, 200, 110, 170, 40, 500]
+            };
+
+            // Intentar mostrar vía Service Worker para mayor fiabilidad bloqueado
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                navigator.serviceWorker.ready.then(reg => reg.showNotification(title, options));
+            } else {
+                new Notification(title, options);
+            }
         }
 
-        audio.play().catch(() => console.log("Interacción requerida para sonido"));
+        audio.play().catch(e => console.log("Audio bloqueado, toca la pantalla"));
         alarmInterval = setInterval(() => {
             audio.currentTime = 0;
             audio.play();
-        }, 2000);
+        }, 8000); // Espaciado para la alarma larga
     }
 
     function detenerAlarma() {
