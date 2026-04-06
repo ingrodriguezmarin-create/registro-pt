@@ -4,95 +4,62 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>RegisPT Pro</title>
-    
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0d6efd">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    
     <style>
-        body { 
-            background-color: #f8f9fa; 
-            padding-top: env(safe-area-inset-top, 20px); 
-            touch-action: manipulation;
-        }
+        body { background-color: #f8f9fa; padding-top: 20px; touch-action: manipulation; }
         .timer-display { font-size: 3.5rem; font-weight: bold; color: #0d6efd; text-align: center; margin: 20px 0; }
         .card { border-radius: 15px; box-shadow: 0 8px 16px rgba(0,0,0,0.1); border: none; }
-        #listaRegistros { max-height: 250px; overflow-y: auto; }
         #btnSilenciar { display: none; background-color: #ffc107; color: #000; font-weight: bold; }
     </style>
 </head>
 <body>
-
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-md-6">
             <div class="card p-4 mb-4 mt-3">
                 <h2 class="text-center mb-4">Registro BHP BHT</h2>
-                
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Tiempo de Registro (HH:MM:SS)</label>
+                    <label class="form-label fw-bold">Tiempo (HH:MM:SS)</label>
                     <div class="input-group">
-                        <input type="number" id="cfgHoras" class="form-control" value="0" min="0">
-                        <input type="number" id="cfgMinutos" class="form-control" value="5" min="0">
-                        <input type="number" id="cfgSegundos" class="form-control" value="0" min="0">
+                        <input type="number" id="cfgHoras" class="form-control" value="0">
+                        <input type="number" id="cfgMinutos" class="form-control" value="5">
+                        <input type="number" id="cfgSegundos" class="form-control" value="0">
                     </div>
                 </div>
-
                 <div class="mb-3">
                     <label class="form-label fw-bold">Nota / Profundidad:</label>
                     <input type="text" id="notaTexto" class="form-control form-control-lg" placeholder="Ej: 1500 ft">
                 </div>
-
                 <div id="display" class="timer-display">00:00:00</div>
-
                 <div class="d-grid gap-3">
-                    <button id="btnIniciar" class="btn btn-primary btn-lg" onclick="iniciarProceso()">Iniciar Conteo y Registrar</button>
+                    <button id="btnIniciar" class="btn btn-primary btn-lg" onclick="iniciarProceso()">Iniciar y Registrar</button>
                     <button id="btnSilenciar" class="btn btn-lg" onclick="detenerAlarma()">DETENER ALARMA</button>
-                    <button id="btnFinalizar" class="btn btn-outline-danger btn-sm" onclick="finalizarYExportar()">Finalizar y Exportar Excel</button>
+                    <button id="btnFinalizar" class="btn btn-outline-danger btn-sm" onclick="finalizarYExportar()">Finalizar y Exportar</button>
                 </div>
             </div>
-
             <div class="card p-3 shadow-sm">
-                <h6>Historial de la sesión:</h6>
+                <h6>Historial:</h6>
                 <ul id="listaRegistros" class="list-group list-group-flush"></ul>
             </div>
         </div>
     </div>
 </div>
 
-<audio id="alarmaAudio" src="https://actions.google.com/sounds/v1/alarms/spaceship_alarm.ogg" preload="auto" loop></audio>
+<audio id="alarmaAudio" src="https://actions.google.com/sounds/v1/alarms/spaceship_alarm.ogg" preload="auto"></audio>
 
 <script>
-    let interval;
-    let alarmInterval;
-    let tiempoFinalizadoMS = 0;
-    const registrosKey = 'mis_registros_app';
-    const timerKey = 'timer_finalizacion_pt';
+    let interval, alarmInterval, tiempoFinalizadoMS = 0;
+    const registrosKey = 'mis_registros_app', timerKey = 'timer_finalizacion_pt';
 
     window.onload = () => {
         actualizarLista();
-        solicitarPermisos();
+        if ("Notification" in window) Notification.requestPermission();
         recuperarTimer();
-        registrarSW();
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
     };
-
-    function registrarSW() {
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(err => console.log("SW error", err));
-        }
-    }
-
-    function solicitarPermisos() {
-        if ("Notification" in window) {
-            Notification.requestPermission().then(perm => {
-                if (perm !== "granted") alert("Activa las notificaciones para avisarte al finalizar.");
-            });
-        }
-    }
 
     function recuperarTimer() {
         const guardado = localStorage.getItem(timerKey);
@@ -101,21 +68,17 @@
             if (tiempoFinalizadoMS > Date.now()) {
                 bloquearInterfaz(true);
                 iniciarIntervaloLogico();
-            } else {
-                localStorage.removeItem(timerKey);
-            }
+            } else { localStorage.removeItem(timerKey); }
         }
     }
 
     async function iniciarProceso() {
         const nota = document.getElementById('notaTexto').value.trim();
         if (!nota) return alert("Escribe una nota.");
-
         const h = parseInt(document.getElementById('cfgHoras').value) || 0;
         const m = parseInt(document.getElementById('cfgMinutos').value) || 0;
         const s = parseInt(document.getElementById('cfgSegundos').value) || 0;
         const totalSegundos = (h * 3600) + (m * 60) + s;
-
         if (totalSegundos <= 0) return alert("Tiempo inválido.");
 
         const ahora = new Date();
@@ -126,7 +89,6 @@
 
         tiempoFinalizadoMS = Date.now() + (totalSegundos * 1000);
         localStorage.setItem(timerKey, tiempoFinalizadoMS);
-
         bloquearInterfaz(true);
         iniciarIntervaloLogico();
     }
@@ -140,44 +102,47 @@
                 localStorage.removeItem(timerKey);
                 actualizarDisplay(0);
                 activarAlarma();
-            } else {
-                actualizarDisplay(Math.floor(restante / 1000));
-            }
+            } else { actualizarDisplay(Math.floor(restante / 1000)); }
         }, 1000);
     }
 
     function activarAlarma() {
         const audio = document.getElementById('alarmaAudio');
-        document.getElementById('btnSilenciar').style.display = 'block';
-        
-        if ("vibrate" in navigator) navigator.vibrate([1000, 500, 1000, 500, 1000]);
+        const btnSilenciar = document.getElementById('btnSilenciar');
+        btnSilenciar.style.display = 'block';
+        const ahoraStr = new Date().toLocaleTimeString();
 
         if (Notification.permission === "granted") {
-            const title = "¡TIEMPO CUMPLIDO!";
+            const title = `¡ALERTA - ${ahoraStr}!`;
             const options = {
-                body: "El registro BHP BHT ha finalizado.",
+                body: `Finalizado a las ${ahoraStr}. Toca para silenciar.`,
                 icon: "https://cdn-icons-png.flaticon.com/512/1082/1082810.png",
-                vibrate: [500, 110, 500, 110, 450, 110, 200, 110, 170, 40, 450, 110, 200, 110, 170, 40, 500]
+                tag: `alarma-${Date.now()}`, 
+                renotify: true
             };
-
-            // Intentar mostrar vía Service Worker para mayor fiabilidad bloqueado
-            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.ready.then(reg => reg.showNotification(title, options));
-            } else {
-                new Notification(title, options);
             }
         }
 
-        audio.play().catch(e => console.log("Audio bloqueado, toca la pantalla"));
+        if ("vibrate" in navigator) navigator.vibrate([1000, 500, 1000]);
+
+        audio.currentTime = 0;
+        audio.play().catch(() => console.log("Interacción requerida"));
+        
+        clearInterval(alarmInterval);
         alarmInterval = setInterval(() => {
+            audio.pause();
             audio.currentTime = 0;
-            audio.play();
-        }, 8000); // Espaciado para la alarma larga
+            audio.play().catch(e => console.log("Reintento fallido"));
+        }, 20000); 
     }
 
     function detenerAlarma() {
         clearInterval(alarmInterval);
-        document.getElementById('alarmaAudio').pause();
+        const audio = document.getElementById('alarmaAudio');
+        audio.pause();
+        audio.currentTime = 0;
         document.getElementById('btnSilenciar').style.display = 'none';
         bloquearInterfaz(false);
         document.getElementById('notaTexto').value = "";
@@ -191,34 +156,22 @@
     }
 
     function actualizarDisplay(sTotales) {
-        const h = Math.floor(sTotales / 3600);
-        const m = Math.floor((sTotales % 3600) / 60);
-        const s = sTotales % 60;
-        document.getElementById('display').innerText = 
-            `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        const h = Math.floor(sTotales / 3600), m = Math.floor((sTotales % 3600) / 60), s = sTotales % 60;
+        document.getElementById('display').innerText = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     }
 
     function actualizarLista() {
         const datos = JSON.parse(localStorage.getItem(registrosKey)) || [];
-        document.getElementById('listaRegistros').innerHTML = datos.reverse().map(r => `
-            <li class="list-group-item d-flex justify-content-between small">
-                <b>${r.hora}</b> <span class="text-primary">${r.nota}</span>
-            </li>`).join('');
+        document.getElementById('listaRegistros').innerHTML = datos.reverse().map(r => `<li class="list-group-item d-flex justify-content-between small"><b>${r.hora}</b> <span class="text-primary">${r.nota}</span></li>`).join('');
     }
 
     function finalizarYExportar() {
         const datos = JSON.parse(localStorage.getItem(registrosKey)) || [];
-        if (datos.length === 0) return alert("No hay datos.");
-        
-        const ws = XLSX.utils.json_to_sheet(datos);
-        const wb = XLSX.utils.book_new();
+        if (!datos.length) return alert("Sin datos.");
+        const ws = XLSX.utils.json_to_sheet(datos), wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Data");
         XLSX.writeFile(wb, `Reporte_${Date.now()}.xlsx`);
-
-        if(confirm("¿Borrar sesión?")) {
-            localStorage.clear();
-            location.reload();
-        }
+        if(confirm("¿Borrar sesión?")) { localStorage.clear(); location.reload(); }
     }
 </script>
 </body>
